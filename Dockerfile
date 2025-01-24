@@ -8,9 +8,10 @@ WORKDIR /app
 RUN mkdir /app_data
 
 # Set environment variables
-ENV CUDA_VISIBLE_DEVICES=0
-ENV PYTHONPATH=/app
+ENV CUDA_LAUNCH_BLOCKING=1
 ENV TOKENIZERS_PARALLELISM=false
+ENV PYTHONPATH=/app
+ENV CUDA_VISIBLE_DEVICES=0
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -43,4 +44,4 @@ ENV FLASK_ENV=production
 ENV FAISS_INDEX_PATH=/app_data/faiss_index
 
 # Command to run the application
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "--preload", "app.main:app"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app.main:app"]

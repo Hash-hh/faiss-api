@@ -1,79 +1,161 @@
 import requests
 import json
 from datetime import datetime
+import time
+from typing import Dict, Any
+import sys
 
 
-def test_search_endpoint():
-    """Test the search API with 'nitrosamine' query"""
+class APITester:
+    def __init__(self, base_url: str = "http://localhost:5000"):
+        self.base_url = base_url.rstrip('/')
+        self.session = requests.Session()  # Use session for better performance
+        self.last_response_time = None
 
-    # API endpoint
-    url = "http://localhost:5000/search"
+    def _make_request(self, method: str, endpoint: str, data: Dict = None, retries: int = 3) -> requests.Response:
+        """Make HTTP request with retry logic and timing"""
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        attempt = 0
 
-    # Test query
-    payload = {
-        "query": "nitrosamine",
-        "k": 5  # Limiting to 5 results for test
-    }
+        while attempt < retries:
+            try:
+                start_time = time.time()
+                response = self.session.request(method, url, json=data)
+                self.last_response_time = time.time() - start_time
 
-    try:
-        # Send POST request
-        print(f"Sending request to {url}...")
-        response = requests.post(url, json=payload)
+                response.raise_for_status()
+                return response
 
-        # Check if request was successful
-        response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                attempt += 1
+                if attempt == retries:
+                    raise
+                print(f"Attempt {attempt} failed: {str(e)}. Retrying...")
+                time.sleep(1)  # Wait 1 second before retry
 
-        # Get the response data
-        data = response.json()
+    def test_search_endpoint(self, query: str = "nitrosamine", k: int = 5) -> Dict[str, Any]:
+        """Test the search API with given query"""
+        print(f"\n=== Testing Search Endpoint ===")
+        print(f"Query: '{query}' (k={k})")
 
-        # Print results in a formatted way
-        print("\n=== Search Results ===")
-        print(f"Status: {data['status']}")
-        print(f"Query: {data['query']}")
-        print(f"Total Results: {data['results_count']}")
-        print("\nTop Results:")
+        try:
+            # Send POST request
+            response = self._make_request(
+                'POST',
+                'search',
+                data={"query": query, "k": k}
+            )
 
-        for idx, result in enumerate(data['results'], 1):
-            print(f"\nResult {idx}:")
-            print(f"File: {result['metadata']['file_name']}")
-            print(f"Page: {result['metadata']['page_number']}")
-            print(f"Confidence: {result['confidence']}%")
-            print(f"Snippet: {result['chunk'][:200]}...")  # First 200 chars of the chunk
+            data = response.json()
 
-        # Save full results to file
+            # Print performance metrics
+            print(f"\nPerformance Metrics:")
+            print(f"Response Time: {self.last_response_time:.3f} seconds")
+            print(f"Response Size: {len(response.content):,} bytes")
+
+            # Print results summary
+            print(f"\nResults Summary:")
+            print(f"Status: {data['status']}")
+            print(f"Total Results: {data['results_count']}")
+
+            # Print detailed results
+            print("\nTop Results:")
+            for idx, result in enumerate(data['results'][:k], 1):
+                print(f"\nResult {idx}:")
+                print("=" * 50)
+                print(f"File: {result['metadata'].get('file_name', 'N/A')}")
+                print(f"Page: {result['metadata'].get('page_number', 'N/A')}")
+                print(f"Confidence: {result.get('confidence', 'N/A')}%")
+
+                # Print chunk with better formatting
+                chunk = result.get('chunk', '')
+                if chunk:
+                    print("\nSnippet:")
+                    print("-" * 50)
+                    print(f"{chunk[:300]}...")
+                    print("-" * 50)
+
+            # Save results to file
+            self._save_results(data, query)
+
+            return data
+
+        except requests.exceptions.ConnectionError:
+            print(f"ERROR: Could not connect to server at {self.base_url}")
+            print("Make sure the server is running and the URL is correct.")
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {str(e)}")
+        except json.JSONDecodeError:
+            print("ERROR: Server returned invalid JSON response")
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+
+        return None
+
+    def test_health_endpoint(self) -> Dict[str, Any]:
+        """Test the health check endpoint"""
+        print("\n=== Testing Health Endpoint ===")
+
+        try:
+            response = self._make_request('GET', 'health')
+            data = response.json()
+
+            print(f"Response Time: {self.last_response_time:.3f} seconds")
+            print("\nHealth Status:")
+            print(f"├─ Status: {data['status']}")
+            print(f"├─ GPU Available: {data['gpu_available']}")
+            print(f"├─ GPU Device: {data['gpu_device']}")
+            print(f"└─ Index Loaded: {data['index_loaded']}")
+
+            return data
+
+        except Exception as e:
+            print(f"Health check failed: {str(e)}")
+            return None
+
+    def _save_results(self, data: Dict, query: str) -> None:
+        """Save results to a JSON file"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"test_results_{timestamp}.json"
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"\nFull results saved to: {output_file}")
+        filename = f"search_results_{query.replace(' ', '_')}_{timestamp}.json"
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request: {e}")
-    except Exception as e:
-        print(f"Error: {e}")
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'metadata': {
+                        'timestamp': datetime.now().isoformat(),
+                        'query': query,
+                        'response_time': self.last_response_time,
+                    },
+                    'data': data
+                }, f, indent=2, ensure_ascii=False)
+            print(f"\nResults saved to: {filename}")
+        except Exception as e:
+            print(f"Error saving results: {str(e)}")
 
 
-def test_health_endpoint():
-    """Test the health check endpoint"""
-    try:
-        response = requests.get("http://localhost:5000/health")
-        response.raise_for_status()
-        data = response.json()
+def main():
+    # Configure the tester
+    tester = APITester()
 
-        print("\n=== Health Check ===")
-        print(f"Status: {data['status']}")
-        print(f"GPU Available: {data['gpu_available']}")
-        print(f"GPU Device: {data['gpu_device']}")
-        print(f"Index Loaded: {data['index_loaded']}")
+    # Test queries
+    queries = [
+        ("nitrosamine", 5),
+        ("nitrosamine formation", 3),
+        # Add more test queries as needed
+    ]
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error checking health: {e}")
+    # Run health check first
+    health_data = tester.test_health_endpoint()
+    if not health_data or health_data.get('status') != 'healthy':
+        print("\nWARNING: Server might not be healthy!")
+        if input("Continue with tests? (y/n): ").lower() != 'y':
+            sys.exit(1)
+
+    # Run search tests
+    for query, k in queries:
+        tester.test_search_endpoint(query, k)
+        time.sleep(1)  # Small delay between requests
 
 
 if __name__ == "__main__":
-    # Run tests
-    print("Testing health endpoint...")
-    test_health_endpoint()
-
-    print("\nTesting search endpoint...")
-    test_search_endpoint()
+    main()
