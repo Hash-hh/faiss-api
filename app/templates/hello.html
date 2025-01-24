@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FAISS Search API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .status {
+            color: green;
+            font-weight: bold;
+        }
+        .endpoint {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 FAISS Search API</h1>
+    <div class="container">
+        <p class="status">Status: Running</p>
+        <p>GPU Status: {{ gpu_status }}</p>
+        <p>Device: {{ gpu_device }}</p>
+        <p>FAISS Index: {{ index_status }}</p>
+    </div>
+
+    <h2>Available Endpoints:</h2>
+    <div class="endpoint">
+        <h3>POST /search</h3>
+        <p>Search the vector database</p>
+        <p>Example request:</p>
+        <code>
+        POST /search<br>
+        Content-Type: application/json<br>
+        {<br>
+        &nbsp;&nbsp;"query": "your search term",<br>
+        &nbsp;&nbsp;"k": 200<br>
+        }
+        </code>
+    </div>
+
+    <div class="endpoint">
+        <h3>GET /health</h3>
+        <p>Check API health status</p>
+    </div>
+</body>
+</html>

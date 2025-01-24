@@ -1,0 +1,27 @@
+services:
+  search-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app_data:/app_data:ro
+    environment:
+      - FAISS_INDEX_PATH=/app_data/faiss_index
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        limits:
+          memory: 16G  # Add memory limit
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [compute,utility]
+    restart: unless-stopped
+
+# Add build cache
+volumes:
+  pip-cache:
+    driver: local
