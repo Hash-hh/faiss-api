@@ -7,6 +7,7 @@ services:
       - "5000:5000"
     volumes:
       - ./app_data:/app_data:ro
+      - ./logs:/app/logs
     environment:
       - FAISS_INDEX_PATH=/app_data/faiss_index
       - NVIDIA_VISIBLE_DEVICES=all
